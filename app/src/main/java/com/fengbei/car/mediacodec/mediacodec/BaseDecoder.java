@@ -37,7 +37,7 @@ public abstract class BaseDecoder implements IDecoder {
     /**
      * 音视频解码器
      */
-    private MediaCodec mCodec;
+    protected MediaCodec mCodec;
 
     /**
      * 音视频数据读取器
@@ -74,7 +74,7 @@ public abstract class BaseDecoder implements IDecoder {
      * 解码状态监听
      */
 
-    private IDecodeStateListener mStateListener;
+    protected IDecodeStateListener mStateListener;
 
 
     /**
@@ -119,7 +119,7 @@ public abstract class BaseDecoder implements IDecoder {
      *
      * @return
      */
-    abstract boolean check();
+    protected abstract boolean check();
 
     /**
      * 初始化音视频流提取器
@@ -127,35 +127,34 @@ public abstract class BaseDecoder implements IDecoder {
      * @param path
      * @return
      */
-    abstract IExtractor initExtractor(String path);
+    protected abstract IExtractor initExtractor(String path);
 
     /**
      * 初始化子类特有的参数
      */
-    abstract void initSpecParams(MediaFormat mediaFormat);
+    protected abstract void initSpecParams(MediaFormat mediaFormat);
 
     /**
      * 配置解码器
      */
-
-    abstract boolean configCodec(MediaCodec mediaCodec, MediaFormat format);
+    protected abstract boolean configCodec(MediaCodec mediaCodec, MediaFormat format);
 
     /**
      * 初始化渲染器
      */
 
-    abstract boolean initRender();
+    protected abstract boolean initRender();
 
     /**
      * 渲染
      */
-    abstract void render(ByteBuffer outputBuffer, MediaCodec.BufferInfo bufferInfo);
+    protected abstract void render(ByteBuffer outputBuffer, MediaCodec.BufferInfo bufferInfo);
 
 
     /**
      * 结束解码
      */
-    abstract void doneDecode();
+    protected abstract void doneDecode();
 
     /**
      * 关键解码流程
@@ -163,10 +162,14 @@ public abstract class BaseDecoder implements IDecoder {
     @Override
     public void run() {
         mState = DecodeState.START;
-        mStateListener.decoderPrepare(this);
+        Log.d(TAG, "run() :");
+        if (mStateListener != null) {
+            mStateListener.decoderPrepare(this);
+        }
 
         // 1.初始胡，启动解码器
         if (!init()) {
+            Log.d(TAG, "init() :");
             return;
         }
 
@@ -201,12 +204,12 @@ public abstract class BaseDecoder implements IDecoder {
                 if (mState == DecodeState.START) {
                     mState = DecodeState.PAUSE;
                 }
-
-                //  6.判断解码是否完成
-                if (mBufferInfo.flags == MediaCodec.BUFFER_FLAG_END_OF_STREAM) {
-                    mState = DecodeState.FINISH;
+            }
+            //  6.判断解码是否完成
+            if (mBufferInfo.flags == MediaCodec.BUFFER_FLAG_END_OF_STREAM) {
+                mState = DecodeState.FINISH;
+                if (mStateListener != null)
                     mStateListener.decoderFinish(this);
-                }
             }
         }
 
@@ -220,7 +223,8 @@ public abstract class BaseDecoder implements IDecoder {
         //  1.校验目标音视频文件的合法性
         if (mFilePath.isEmpty() || !new File(mFilePath).exists()) {
             Log.w(TAG, "文件路径为空");
-            mStateListener.decoderError(this, "文件路径为空");
+            if (mStateListener != null)
+                mStateListener.decoderError(this, "文件路径为空");
             return false;
         }
 
@@ -231,8 +235,9 @@ public abstract class BaseDecoder implements IDecoder {
 
         //  2.  初始化数据提取器
         mExtractor = initExtractor(mFilePath);
-
-        if (mExtractor != null || mExtractor.getFormat() == null) {
+        Log.w(TAG, "initExtractor ");
+        MediaFormat format = mExtractor.getFormat();
+        if (mExtractor == null || format == null) {
             Log.w(TAG, "无法解析文件");
             return false;
         }
@@ -249,20 +254,19 @@ public abstract class BaseDecoder implements IDecoder {
         }
 
         //  5. 初始化解码器
-        if (!initConfig()) {
+        if (!initCodec()) {
             return false;
         }
 
         return true;
     }
 
-    private boolean initConfig() {
+    private boolean initCodec() {
         try {
             //  1.根据音视频的编码格式来初始化解码器
             MediaFormat format = mExtractor.getFormat();
             String type = format.getString(MediaFormat.KEY_MIME);
             mCodec = MediaCodec.createDecoderByType(type);
-            mCodec = MediaCodec.cre(type);
 
             //  2.配置解码器
             if (!configCodec(mCodec, format)) {
@@ -287,7 +291,7 @@ public abstract class BaseDecoder implements IDecoder {
      * 未初始化完成解码线程进入等待阶段
      */
     private void waitDecode() {
-        if (mState == DecodeState.PAUSE) {
+        if (mState == DecodeState.PAUSE && mStateListener != null) {
             mStateListener.decoderPause(this);
         }
         synchronized (mLocke) {
@@ -310,7 +314,7 @@ public abstract class BaseDecoder implements IDecoder {
             mLocke.notifyAll();
         }
 
-        if (mState == DecodeState.DECODING) {
+        if (mState == DecodeState.DECODING && mStateListener != null) {
             mStateListener.decoderRunning(this);
         }
     }
@@ -386,14 +390,93 @@ public abstract class BaseDecoder implements IDecoder {
             mExtractor.stop();
             mCodec.stop();
             mCodec.release();
-            mStateListener.decoderDestroy(this);
+            if (mStateListener != null)
+                mStateListener.decoderDestroy(this);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
 
+
+    @Override
+    public void goOn() {
+        mState = DecodeState.DECODING;
+        notifyDecode();
+    }
+
+    @Override
+    public long seekTo(long pos) {
+        return 0;
+    }
+
+    @Override
+    public void pause() {
+        mState = DecodeState.DECODING;
+    }
+
+    @Override
+    public boolean isSeeking() {
+        return mState == DecodeState.SEEKING;
+    }
+
+    @Override
+    public boolean isDecoding() {
+        return mState == DecodeState.DECODING;
+    }
+
+    @Override
+    public boolean isStop() {
+        return mState == DecodeState.STOP;
+    }
+
+    @Override
+    public void setStateLinstener() {
 
     }
 
+    @Override
+    public int getWidth() {
+        return 0;
+    }
+
+    @Override
+    public int getHeight() {
+        return 0;
+    }
+
+    @Override
+    public long getDuration() {
+        return 0;
+    }
+
+    @Override
+    public int getRotationAngle() {
+        return 0;
+    }
+
+    @Override
+    public MediaFormat getMediaFormat() {
+        return null;
+    }
+
+    @Override
+    public int getTrack() {
+        return 0;
+    }
+
+    @Override
+    public String getFilePath() {
+        return null;
+    }
+
+    @Override
+    public void stop() {
+        mState = DecodeState.STOP;
+        mIsRuning = false;
+        notifyDecode();
+    }
+
 }
+
 
 

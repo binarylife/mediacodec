@@ -20,6 +20,12 @@ public interface IDecoder extends Runnable {
     void goOn();
 
     /**
+     * 快进
+     */
+
+    long seekTo(long pos);
+
+    /**
      * 停止解码
      */
     void stop();
@@ -37,6 +43,13 @@ public interface IDecoder extends Runnable {
      * @return
      */
     boolean isSeeking();
+
+    /**
+     * 是否正停止
+     *
+     * @return
+     */
+    boolean isStop();
 
     /**
      * 设置状态监听器
