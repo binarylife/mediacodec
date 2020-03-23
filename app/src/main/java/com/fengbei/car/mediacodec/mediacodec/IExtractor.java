@@ -51,4 +51,11 @@ public interface IExtractor {
      * 停止读取数据
      */
     void stop();
+
+    /**
+     * 设置起始的位置
+     */
+
+    int getSampleFlag();
+
 }

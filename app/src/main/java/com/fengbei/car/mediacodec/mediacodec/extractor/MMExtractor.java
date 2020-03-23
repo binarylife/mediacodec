@@ -26,6 +26,11 @@ public class MMExtractor {
      */
     private long mCurSampleTime = 0;
 
+    /**
+     * 当前帧时间flag
+     */
+    private int mCurSampleFlag = 0;
+
     public MMExtractor(String path) {
         mediaExtractor = new MediaExtractor();
         try {
@@ -96,7 +101,8 @@ public class MMExtractor {
             return -1;
         }
 
-        sampleTime = mediaExtractor.getSampleTime();
+        mCurSampleTime = mediaExtractor.getSampleTime();
+        mCurSampleFlag = mediaExtractor.getSampleFlags();
         mediaExtractor.advance();
         return readSampleCount;
     }
@@ -144,6 +150,11 @@ public class MMExtractor {
 
     long getCurrentTimestamp() {
         return mCurSampleTime;
+    }
+
+
+    int getCurSampleFlag() {
+        return mCurSampleFlag;
     }
 
 }

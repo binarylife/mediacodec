@@ -167,6 +167,8 @@ public abstract class BaseDecoder implements IDecoder {
             mStateListener.decoderPrepare(this);
         }
 
+        Log.i(TAG, "开始解码 ");
+
         // 1.初始胡，启动解码器
         if (!init()) {
             Log.d(TAG, "init() :");
@@ -178,11 +180,21 @@ public abstract class BaseDecoder implements IDecoder {
 
             if (mState != DecodeState.START && mState != DecodeState.DECODING &&
                     mState != DecodeState.SEEKING) {
+                Log.i(TAG, "进入等待：$mState" + mState.name());
                 waitDecode();
+
+                //  重置同步时间 ，剔除外部等待时间
+                mStartTimeForSync = System.currentTimeMillis() - getCurTimeStamp();
             }
             if (!mIsRuning || mState == DecodeState.STOP) {
                 mIsRuning = false;
                 break;
+            }
+
+
+            if (mStartTimeForSync == -1l) {
+                mStartTimeForSync = System.currentTimeMillis();
+                Log.i(TAG, "初始化同步时间：$mStartTimeForSync " + mStartTimeForSync);
             }
 
             //  如果数据没有解码完毕，将数据推入解码器
@@ -196,8 +208,16 @@ public abstract class BaseDecoder implements IDecoder {
             int index = pullBufferFromDecoder();
 
             if (index >= 0) {
+                // ---------【音视频同步】-------------
+                if (mSyncRender && mState == DecodeState.DECODING) {
+                    //  如果还未解码完成，则先暂停渲染
+                    sleepRender();
+                }
+
                 //  4 .开启渲染
-                render(mOutPutBuffers[index], mBufferInfo);
+                if (mSyncRender) {
+                    render(mOutPutBuffers[index], mBufferInfo);
+                }
 
                 //  5.释放输出缓冲区
                 mCodec.releaseOutputBuffer(index, true);
@@ -214,9 +234,12 @@ public abstract class BaseDecoder implements IDecoder {
         }
 
         doneDecode();
+
         //  7 释放资源
         release();
+
     }
+
 
     private boolean init() {
 
@@ -352,7 +375,6 @@ public abstract class BaseDecoder implements IDecoder {
             } else {
                 //  将数据压入缓冲器
                 mCodec.queueInputBuffer(dequeueInputBuffer, 0, simpleSize, mExtractor.getCurrentTimestamp(), 0);
-
             }
 
         }
@@ -476,6 +498,32 @@ public abstract class BaseDecoder implements IDecoder {
         notifyDecode();
     }
 
+
+    @Override
+    public long getCurTimeStamp() {
+        return mBufferInfo.presentationTimeUs / 1000;
+    }
+
+    /**
+     * 进入解码前，获取当前系统时间，存放在mStartTimeForSync，
+     * 一帧数据解码出来以后，计算当前系统时间和mStartTimeForSync的距离，
+     * 也就是已经播放的时间，如果当前帧的PTS大于流失的时间，进入sleep，否则直接渲染。
+     */
+    private void sleepRender() {
+        long passTime = System.currentTimeMillis() - mStartTimeForSync;
+        //  当前帧的pts时间（渲染时间）
+        long currentTime = getCurTimeStamp();
+        Log.i(TAG, "时间同步 ：" + "passTime : " + passTime + "currentTime : " + currentTime);
+        if (currentTime > passTime) {
+            try {
+                long l = currentTime - passTime;
+                Thread.sleep(l);
+                Log.i(TAG, "sleep : " + l);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }
 
 

@@ -52,4 +52,9 @@ public class VideoExtractor implements IExtractor {
     public void stop() {
         mmExtractor.stop();
     }
+
+    @Override
+    public int getSampleFlag() {
+        return mmExtractor.getCurSampleFlag();
+    }
 }

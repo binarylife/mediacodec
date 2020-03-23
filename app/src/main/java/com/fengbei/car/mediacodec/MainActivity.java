@@ -11,6 +11,7 @@ import android.widget.Button;
 
 import com.fengbei.car.mediacodec.mediacodec.decoder.AudioDecoder;
 import com.fengbei.car.mediacodec.mediacodec.decoder.VideoDecoder;
+import com.fengbei.car.mediacodec.mediacodec.muxer.MP4Repack;
 import com.fengbei.car.mediacodec.mediacodec.utils.AudioFileFunc;
 
 import java.util.concurrent.ExecutorService;
@@ -60,15 +61,16 @@ public class MainActivity extends Activity {
 
     private void tryStart() {
         Log.d(TAG, "tryStart : ");
+//        trackDemo();
+//        initPlayer();
         videoDecoder.goOn();
         audioDecoder.goOn();
-//        trackDemo();
         Log.d(TAG, "tryStart end : ");
     }
 
     private void pause() {
-        videoDecoder.stop();
-        audioDecoder.stop();
+        MP4Repack mp4Repack = new MP4Repack();
+        mp4Repack.star();
     }
 
     @Override
@@ -113,6 +115,8 @@ public class MainActivity extends Activity {
         executorService.execute(videoDecoder);
         audioDecoder = new AudioDecoder(videoFilePath);
         executorService.execute(audioDecoder);
+//        videoDecoder.goOn();
+//        audioDecoder.goOn();
     }
 
 }

@@ -102,4 +102,10 @@ public interface IDecoder extends Runnable {
      */
 
     String getFilePath();
+
+
+    /**
+     * 获取当前帧的时间
+     */
+    long getCurTimeStamp();
 }
